@@ -81,6 +81,8 @@ The following type codes (marked RESERVED in BONJSON) correspond to the new type
 | 66        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)                    |
 | 67        | 128-bit UUID                 | Number    | [UUID](#uuid)                              |
 | 90        | Type, length, contents       | Container | [Typed array](#typed-array)                |
+| 91        |                              | Reference | [Marker](#marker)                          |
+| 92        |                              | Reference | [Reference](#reference)                    |
 | 97        |                              | Container | [Instance start](#instance)                |
 | 98        |                              | Container | [Type start](#type)                        |
 
@@ -122,7 +124,9 @@ Here is the complete table of type codes (including those defined in [BONJSON](h
 | 78 - 7f   | Signed integer of n bytes    | Number    | Signed Integer                             |
 | 80 - 8f   | String of n bytes            | String    | Short String                               |
 | 90        | Type, length, contents       | Container | [Typed array](#typed-array)                |
-| 91 - 96   |                              |           | RESERVED                                   |
+| 91        |                              | Reference | [Marker](#marker)                          |
+| 92        |                              | Reference | [Reference](#reference)                    |
+| 93 - 96   |                              |           | RESERVED                                   |
 | 97        |                              | Container | [Instance start](#instance)                |
 | 98        |                              | Container | [Type start](#type)                        |
 | 99        |                              | Container | Array start                                |
@@ -151,7 +155,7 @@ Type
 
 A type declares a new type, listing what the field names are. An [instance](#instance) will reference this type and list out the corresponding values.
 
-A type begins with a globally unique type name, followed by a series of field names, and is terminated wuth an end container
+A type begins with a globally unique (to the document) type name, followed by a series of field names, and is terminated wuth an end container
 
     [type name] [field name] ... [end container]
 
@@ -201,7 +205,30 @@ The following type codes may be used as element types:
 | 70 - 77   | Unsigned integer of n bytes  | Number    | Unsigned Integer                           |
 | 78 - 7f   | Signed integer of n bytes    | Number    | Signed Integer                             |
 
-TODO: Allow string?
+TODO: Allow fixed-length strings (1-15 bytes)?
+
+
+
+Marker
+------
+
+TODO: Keep this?
+
+A marker marks the value following it with an identifier that can be [referenced](#reference) later.
+
+The marker itself is not a value, and is thus invisible structurally.
+
+
+
+Reference
+---------
+
+TODO: Keep this?
+
+A reference is a value placeholder that refers to a [previously marked value](#marker).
+
+A reference **MUST** refer to a reference made earlier in the document (no forward referencing).
+
 
 
 
@@ -254,14 +281,10 @@ Where type is:
 
 ### Marker
 
-TODO: Keep this?
-
 `&remember_me:{"name": "Mighty Thor" "age": 1000}`
 
 
 ### Reference
-
-TODO: Keep this?
 
 `{"Thor": $remember_me}`
 
