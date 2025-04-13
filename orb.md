@@ -1,0 +1,292 @@
+Object Representation in Binary
+===============================
+
+Orb is an extension of [BONJSON](https://github.com/kstenerud/bonjson/blob/main/bonjson.md) that adds many commonly used types.
+
+
+
+WIP DRAFT
+---------
+
+This is currently in early WIP draft form, and subject to extensive changes.
+
+
+
+Contents
+--------
+
+- [Object Representation in Binary](#object-representation-in-binary)
+  - [WIP DRAFT](#wip-draft)
+  - [Contents](#contents)
+  - [Terms and Conventions](#terms-and-conventions)
+  - [Modifications](#modifications)
+    - [Allowed values](#allowed-values)
+    - [New Type Codes](#new-type-codes)
+    - [JSON-like text format](#json-like-text-format)
+  - [Encoding](#encoding)
+    - [Type Codes](#type-codes)
+  - [Timestamp](#timestamp)
+  - [UUID](#uuid)
+  - [Type](#type)
+  - [Instance](#instance)
+  - [Typed Array](#typed-array)
+  - [ORT - Object Representation in Text](#ort---object-representation-in-text)
+    - [Timestamp](#timestamp-1)
+    - [UUID](#uuid-1)
+    - [Type](#type-1)
+    - [Instance](#instance-1)
+    - [Typed Array](#typed-array-1)
+    - [Comment](#comment)
+    - [Marker](#marker)
+    - [Reference](#reference)
+    - [New literals](#new-literals)
+  - [License](#license)
+
+
+
+Terms and Conventions
+---------------------
+
+**The following bolded, capitalized terms have specific meanings in this document**:
+
+| Term             | Meaning                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| **MUST (NOT)**   | If this directive is not adhered to, the document or implementation is invalid.                  |
+| **SHOULD (NOT)** | Every effort should be made to follow this directive, but it's still conformant if not followed. |
+| **MAY (NOT)**    | It is up to the implementation to decide whether to do something or not.                         |
+| **CAN**          | Refers to a possibility which **MUST** be accommodated by the implementation.                    |
+| **CANNOT**       | Refers to a situation which **MUST NOT** be allowed by the implementation.                       |
+
+-----------------------------------------------------------------------------------------------------------------------
+
+
+
+Modifications
+-------------
+
+ORB should be considered an extension to BONJSON, adding more types and modifying the rules slightly. The BONJSON specification applies to ORB except where this specification overrides it:
+
+
+### Allowed values
+
+Floating point NaN and infinity values are allowed in ORB.
+
+
+### New Type Codes
+
+The following type codes (marked RESERVED in BONJSON) correspond to the new types in ORB:
+
+| Type Code | Payload                      | Type      | Description                                |
+| --------- | ---------------------------- | --------- | ------------------------------------------ |
+| 66        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)                    |
+| 67        | 128-bit UUID                 | Number    | [UUID](#uuid)                              |
+| 90        | Type, length, contents       | Container | [Typed array](#typed-array)                |
+| 97        |                              | Container | [Instance start](#instance)                |
+| 98        |                              | Container | [Type start](#type)                        |
+
+
+### JSON-like text format
+
+ORB's textual form (ORT: Object Representation in Text) is mostly the same as JSON, with the following changes:
+
+* `/* */` and `//` can be used as comment delimiters
+* Commas are now considered "whitespace"
+* Values must be separated by at least one whitespace
+* Encodings for the new types
+
+
+
+Encoding
+--------
+
+
+### Type Codes
+
+Here is the complete table of type codes (including those defined in [BONJSON](https://github.com/kstenerud/bonjson/blob/main/bonjson.md)):
+
+| Type Code | Payload                      | Type      | Description                                |
+| --------- | ---------------------------- | --------- | ------------------------------------------ |
+| 00 - 64   |                              | Number    | Integers 0 through 100                     |
+| 65        |                              |           | RESERVED                                   |
+| 66        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)                    |
+| 67        | 128-bit UUID                 | Number    | [UUID](#uuid)                              |
+| 68        | Arbitrary length string      | String    | Long String                                |
+| 69        | Arbitrary length number      | Number    | Big Number                                 |
+| 6a        | 16-bit bfloat16 binary float | Number    | 16-bit float                               |
+| 6b        | 32-bit ieee754 binary float  | Number    | 32-bit float                               |
+| 6c        | 64-bit ieee754 binary float  | Number    | 64-bit float                               |
+| 6d        |                              | Null      | Null                                       |
+| 6e        |                              | Boolean   | False                                      |
+| 6f        |                              | Boolean   | True                                       |
+| 70 - 77   | Unsigned integer of n bytes  | Number    | Unsigned Integer                           |
+| 78 - 7f   | Signed integer of n bytes    | Number    | Signed Integer                             |
+| 80 - 8f   | String of n bytes            | String    | Short String                               |
+| 90        | Type, length, contents       | Container | [Typed array](#typed-array)                |
+| 91 - 96   |                              |           | RESERVED                                   |
+| 97        |                              | Container | [Instance start](#instance)                |
+| 98        |                              | Container | [Type start](#type)                        |
+| 99        |                              | Container | Array start                                |
+| 9a        |                              | Container | Object start                               |
+| 9b        |                              | Container | Container end                              |
+| 9c - ff   |                              | Number    | Integers -100 through -1                   |
+
+
+
+Timestamp
+---------
+
+A timestamp contains the number of nanoseconds since January 11, 1970, 00:00 UTC.
+
+
+
+UUID
+----
+
+A UUID consists of 128 bits of data in big endian order.
+
+
+
+Type
+----
+
+A type declares a new type, listing what the field names are. An [instance](#instance) will reference this type and list out the corresponding values.
+
+A type begins with a globally unique type name, followed by a series of field names, and is terminated wuth an end container
+
+    [type name] [field name] ... [end container]
+
+Types are not structurally significant in an of themselves. They are effectively invisible to the document structure, so a type following an object name will not fulfil the role of the name's corresponding value.
+
+A type **MUST NOT** contain duplicate field names.
+A type's name **MUST** be unique to the entire document.
+A type **MUST** be declared before any [instances](#instance) that reference it.
+
+
+
+Instance
+--------
+
+An instance is the other half of a [type](#type), listing out the values that correspond to the field names of the [type](#type).
+
+    [type name] [field value] ... [end container]
+
+An instance **MUST** contain exactly the same number of values as the number of field names in the [type](#type) it references.
+
+An instance **MUST** not appear before the [type](#type) it references.
+
+
+
+Typed Array
+-----------
+
+A typed array is a more compact representation of an array, where all values are of the same type and size. This allows for efficient copying of data into a CPU-native array.
+
+The type code is followed by the element's type code, and then chunks of values.
+
+    [type code] [element type code] [chunk] ...
+
+Each chunk consists of a chunk header (containing a length field), followed by that many elements of data, until the end of a chunk where the continuation bit is 0:
+
+    [chunk header] [chunk data]
+
+The following type codes may be used as element types:
+
+| Type Code | Payload                      | Type      | Description                                |
+| --------- | ---------------------------- | --------- | ------------------------------------------ |
+| 66        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)                    |
+| 67        | 128-bit UUID                 | Number    | [UUID](#uuid)                              |
+| 6a        | 16-bit bfloat16 binary float | Number    | 16-bit float                               |
+| 6b        | 32-bit ieee754 binary float  | Number    | 32-bit float                               |
+| 6c        | 64-bit ieee754 binary float  | Number    | 64-bit float                               |
+| 70 - 77   | Unsigned integer of n bytes  | Number    | Unsigned Integer                           |
+| 78 - 7f   | Signed integer of n bytes    | Number    | Signed Integer                             |
+
+TODO: Allow string?
+
+
+
+ORT - Object Representation in Text
+-----------------------------------
+
+ORT is the textual representation of ORB.
+
+ORT follows most of the conventions of JSON, with some extra types, and some modifications:
+- Values are separated by one or more whitespace characters.
+- Commas are considered whitespace.
+- Strings that don't contain structural characters or match reserved literals can be used without quotes?
+
+Any valid JSON document can be read as an ORT document.
+
+
+### Timestamp
+
+Use RFC 3339
+
+### UUID
+
+RFC 9562
+
+### Type
+
+`@mytype<a b c>`
+
+### Instance
+
+`@mytype{1 2 3}`
+
+### Typed Array
+
+`@type[1 2 3]`
+
+Where type is:
+- `u8` to `u64`
+- `i8` to `i64`
+- `timestamp`
+- `uuid`
+- `f16`, `f32`, `f64`
+
+### Comment
+
+```
+/* */
+//
+```
+
+### Marker
+
+TODO: Keep this?
+
+`&remember_me:{"name": "Mighty Thor" "age": 1000}`
+
+
+### Reference
+
+TODO: Keep this?
+
+`{"Thor": $remember_me}`
+
+
+Nested comments: Simple string search for */ to terminate, or /* to initiate the next nesting level. If strings contain confounding chars, too bad.
+
+### New literals
+
+- `nan`
+- `inf` / `-inf`
+
+So all literals will be:
+
+- `true`
+- `false`
+- `null`
+- `nan`
+- `inf`
+- `-inf`
+
+
+
+License
+-------
+
+Copyright (c) 2025 Karl Stenerud. All rights reserved.
+
+Distributed under the [Creative Commons Attribution License](https://creativecommons.org/licenses/by/4.0/legalcode) ([license deed](https://creativecommons.org/licenses/by/4.0).
