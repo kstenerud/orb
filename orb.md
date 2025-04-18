@@ -23,22 +23,25 @@ Contents
     - [Allowed values](#allowed-values)
     - [New Type Codes](#new-type-codes)
     - [JSON-like text format](#json-like-text-format)
+  - [Structure](#structure)
   - [Encoding](#encoding)
     - [Type Codes](#type-codes)
   - [Timestamp](#timestamp)
   - [UUID](#uuid)
-  - [Type](#type)
-  - [Instance](#instance)
+  - [Record Definition](#record-definition)
+  - [Record](#record)
   - [Typed Array](#typed-array)
+  - [Marker](#marker)
+  - [Reference](#reference)
   - [ORT - Object Representation in Text](#ort---object-representation-in-text)
     - [Timestamp](#timestamp-1)
     - [UUID](#uuid-1)
-    - [Type](#type-1)
-    - [Instance](#instance-1)
+    - [Type](#type)
+    - [Instance](#instance)
     - [Typed Array](#typed-array-1)
     - [Comment](#comment)
-    - [Marker](#marker)
-    - [Reference](#reference)
+    - [Marker](#marker-1)
+    - [Reference](#reference-1)
     - [New literals](#new-literals)
   - [License](#license)
 
@@ -83,8 +86,8 @@ The following type codes (marked RESERVED in BONJSON) correspond to the new type
 | 90        | Type, length, contents       | Container | [Typed array](#typed-array)                |
 | 91        |                              | Reference | [Marker](#marker)                          |
 | 92        |                              | Reference | [Reference](#reference)                    |
-| 97        |                              | Container | [Instance start](#instance)                |
-| 98        |                              | Container | [Type start](#type)                        |
+| 97        |                              | Container | [Record start](#instance)                  |
+| 98        |                              | Container | [Record definition start](#type)           |
 
 
 ### JSON-like text format
@@ -93,8 +96,62 @@ ORB's textual form (ORT: Object Representation in Text) is mostly the same as JS
 
 * `/* */` and `//` can be used as comment delimiters
 * Commas are now considered "whitespace"
-* Values must be separated by at least one whitespace
+* Values must be separated by at least one whitespace (key-value pairs only require a `:` in between them, with extra whitespace allowed)
 * Encodings for the new types
+
+
+Structure
+---------
+
+ORB follows the same general structure as JSON, but allows more types, and also supports records and references.
+
+**Document**:
+
+    ──[value]──>
+
+**Value**:
+
+    ──┬─>─────────┬─┬─>───────────┬─┬─>─[string]──────┬─>
+      ├─>─[type]──┤ ╰─>─[marker]──╯ ├─>─[number]──────┤
+      ╰─<─<─<─<─<─╯                 ├─>─[object]──────┤
+                                    ├─>─[array]───────┤
+                                    ├─>─[boolean]─────┤
+                                    ├─>─[null]────────┤
+                                    ├─>─[timestamp]───┤
+                                    ├─>─[uuid]────────┤
+                                    ├─>─[typed array]─┤
+                                    ├─>─[instance]────┤
+                                    ╰─>─[reference]───╯
+
+**Object**:
+
+    ──[begin object]─┬─>────────────────────┬─[end container]──>
+                     ├─>─[string]──[value]──┤
+                     ╰─<─<─<─<─<─<─<─<─<─<──╯
+
+**Array**:
+
+    ──[begin array]─┬─>──────────┬─[end container]──>
+                    ├─>─[value]──┤
+                    ╰─<─<─<─<─<──╯
+
+**Typed Array**:
+
+    ──[begin typed array]─┬─>────────────┬─[end]──>
+                          ├─>─[element]──┤
+                          ╰─<─<─<─<─<─<──╯
+
+**Type**:
+
+    ──[begin type]─┬─>─────────┬─[end container]──>
+                   ├─>─[name]──┤
+                   ╰─<─<─<─<─<─╯
+
+**Instance**:
+
+    ──[begin instance]─┬─>──────────┬─[end container]──>
+                       ├─>─[value]──┤
+                       ╰─<─<─<─<─<──╯
 
 
 
@@ -139,21 +196,24 @@ Here is the complete table of type codes (including those defined in [BONJSON](h
 Timestamp
 ---------
 
-A timestamp contains the number of nanoseconds since January 11, 1970, 00:00 UTC.
+A timestamp is a 64-bit integer representing the number of nanoseconds elapsed since 00:00 UTC January 1st, 1900 (disregarding any human adjustments such as leap seconds). It can support timestamps up to the year 2484.
+
 
 
 
 UUID
 ----
 
-A UUID consists of 128 bits of data in big endian order.
+A UUID consists of 128 bits of data in big endian order, per RFC 9562 section 4.
 
 
 
-Type
-----
+Record Definition
+-----------------
 
-A type declares a new type, listing what the field names are. An [instance](#instance) will reference this type and list out the corresponding values.
+A record definition declares a new type of record, listing what the field names are. A [record](#record) will reference this definition and list out the corresponding values.
+
+A record definition can be declared anywhere a value can be declared, and is considered "invisible" to the document structure (it is not considered a value and does not affect the document structure).
 
 A type begins with a globally unique (to the document) type name, followed by a series of field names, and is terminated wuth an end container
 
@@ -167,10 +227,10 @@ A type **MUST** be declared before any [instances](#instance) that reference it.
 
 
 
-Instance
---------
+Record
+------
 
-An instance is the other half of a [type](#type), listing out the values that correspond to the field names of the [type](#type).
+An instance is the other half of a [record definition](#record-definition), listing out the values that correspond to its field names.
 
     [type name] [field value] ... [end container]
 
