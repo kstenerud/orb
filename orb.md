@@ -111,17 +111,17 @@ ORB follows the same general structure as JSON, but allows more types, and also 
 
 **Value**:
 
-    ──┬─>─────────┬─┬─>───────────┬─┬─>─[string]──────┬─>
-      ├─>─[type]──┤ ╰─>─[marker]──╯ ├─>─[number]──────┤
-      ╰─<─<─<─<─<─╯                 ├─>─[object]──────┤
-                                    ├─>─[array]───────┤
-                                    ├─>─[boolean]─────┤
-                                    ├─>─[null]────────┤
-                                    ├─>─[timestamp]───┤
-                                    ├─>─[uuid]────────┤
-                                    ├─>─[typed array]─┤
-                                    ├─>─[instance]────┤
-                                    ╰─>─[reference]───╯
+    ──┬─>───────────────┬─┬─>───────────┬─┬─>─[string]──────┬─>
+      ├─>─[definition]──┤ ╰─>─[marker]──╯ ├─>─[number]──────┤
+      ╰─<─<─<─<─<─<─<─<─╯                 ├─>─[object]──────┤
+                                          ├─>─[array]───────┤
+                                          ├─>─[boolean]─────┤
+                                          ├─>─[null]────────┤
+                                          ├─>─[timestamp]───┤
+                                          ├─>─[uuid]────────┤
+                                          ├─>─[typed array]─┤
+                                          ├─>─[record]──────┤
+                                          ╰─>─[reference]───╯
 
 **Object**:
 
