@@ -36,8 +36,8 @@ Contents
   - [ORT - Object Representation in Text](#ort---object-representation-in-text)
     - [Timestamp](#timestamp-1)
     - [UUID](#uuid-1)
-    - [Type](#type)
-    - [Instance](#instance)
+    - [Record Definition](#record-definition-1)
+    - [Record](#record-1)
     - [Typed Array](#typed-array-1)
     - [Comment](#comment)
     - [Marker](#marker-1)
@@ -213,30 +213,30 @@ Record Definition
 
 A record definition declares a new type of record, listing what the field names are. A [record](#record) will reference this definition and list out the corresponding values.
 
-A record definition can be declared anywhere a value can be declared, and is considered "invisible" to the document structure (it is not considered a value and does not affect the document structure).
+A definition can be declared anywhere a value can be declared, and is considered "invisible" to the document structure (it is not considered a value and does not affect the document structure).
 
-A type begins with a globally unique (to the document) type name, followed by a series of field names, and is terminated wuth an end container
+A record definition begins with a globally unique (to the document) definition name, followed by a series of field names, and is terminated wuth an end container
 
-    [type name] [field name] ... [end container]
+    [definition name] [field name] ... [end container]
 
-Types are not structurally significant in an of themselves. They are effectively invisible to the document structure, so a type following an object name will not fulfil the role of the name's corresponding value.
+Definitions are not structurally significant in an of themselves. They are effectively invisible to the document structure, so a definition following an object name will not fulfil the role of the name's corresponding value.
 
-A type **MUST NOT** contain duplicate field names.
-A type's name **MUST** be unique to the entire document.
-A type **MUST** be declared before any [instances](#instance) that reference it.
+A definition **MUST NOT** contain duplicate field names.
+A definition's name **MUST** be unique to the entire document.
+A definition **MUST** be declared before any [instances](#instance) that reference it.
 
 
 
 Record
 ------
 
-An instance is the other half of a [record definition](#record-definition), listing out the values that correspond to its field names.
+A record is a data instance that lists out the values corresponding to its [record definition](#record-definition), in the same order as the field names were defined.
 
-    [type name] [field value] ... [end container]
+    [definition name] [field value] ... [end container]
 
-An instance **MUST** contain exactly the same number of values as the number of field names in the [type](#type) it references.
+A record **MUST** contain exactly the same number of values as the number of field names in the [definition](#record-definition) it references (and in the same order).
 
-An instance **MUST** not appear before the [type](#type) it references.
+A record **MUST** not appear before the [definition](#record-definition) it references.
 
 
 
@@ -313,13 +313,13 @@ Use RFC 3339
 
 RFC 9562
 
-### Type
+### Record Definition
 
-`@mytype<a b c>`
+`@my_record<name age score>`
 
-### Instance
+### Record
 
-`@mytype{1 2 3}`
+`@my_record{"bill" 40 85923395}`
 
 ### Typed Array
 
