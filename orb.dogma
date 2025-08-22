@@ -1,0 +1,106 @@
+dogma_v1 utf-8
+- identifier  = orb_v1
+- description = Object Representation in Binary, version 1
+- dogma       = https://github.com/kstenerud/dogma/blob/master/v1/dogma_v1.0.md
+
+document          = byte_order(lsb, ordered_document);
+ordered_document  = value;
+
+value             = string | number | boolean | null | object | array | timestamp | uuid | record | typed_array | reference;
+key               = string;
+
+# Types
+
+array             = u8(0x99) & value* & end_container;
+object            = u8(0x9a) & (string & value)* & end_container;
+end_container     = u8(0x9b);
+
+number            = int_small | int_unsigned | int_signed | float_16 | float_32 | float_64 | big_number;
+int_small         = i8(-100~100);
+int_unsigned      = u4(7) & u1(0) & u3(var(count, ~)) & ordered(uint((count+1)*8, ~));
+int_signed        = u4(7) & u1(1) & u3(var(count, ~)) & ordered(sint((count+1)*8, ~));
+float_16          = u8(0x6a) & f16(~);
+float_32          = u8(0x6b) & f32(~);
+float_64          = u8(0x6c) & f64(~);
+big_number        = u8(0x69)
+                  & var(header, big_number_header)
+                  & [
+                        header.sig_length > 0: ordered(sint(header.exp_length*8, ~))
+                                             & ordered(uint(header.sig_length*8, ~))
+                                             ;
+                    ]
+                  ;
+big_number_header = u5(var(sig_length, ~)) & u2(var(exp_length, ~)) & u1(var(sig_negative, ~));
+timestamp         = u8(0x66) & u64(~);
+uuid              = u8(0x67) & id128(~); # Note: Big endian
+marker            = u8(0x91) & identifier;
+reference         = u8(0x92) & identifier;
+record            = u8(0x97) & identifier & value* & end_container;
+record_definition = u8(0x98) & identifier & key* & end_container;
+
+boolean           = true | false;
+false             = u8(0x6e);
+true              = u8(0x6f);
+
+null              = u8(0x6d);
+
+typed_array       = u8_array | u16_array | u32_array | u64_array
+                  | s8_array | s16_array | s32_array | s64_array
+                  | f16_array | f32_array | f64_array
+                  | ts_array
+                  | id_array
+                  ;
+u8_array          = array_type(0x70, u8(~));
+u16_array         = array_type(0x71, u16(~));
+u32_array         = array_type(0x73, u32(~));
+u64_array         = array_type(0x77, u64(~));
+s8_array          = array_type(0x78, s8(~));
+s16_array         = array_type(0x79, s16(~));
+s32_array         = array_type(0x7b, s32(~));
+s64_array         = array_type(0x7f, s64(~));
+f16_array         = array_type(0x6a, f16(~));
+f32_array         = array_type(0x6b, f32(~));
+f64_array         = array_type(0x6c, f64(~));
+ts_array          = array_type(0x66, u64(~));
+id_array          = array_type(0x67, id128(~)); # Note: Big endian
+array_type(elem_type, elem) = u8(0x90) & elem_type & elem_chunk(elem, 1)* & elem_chunk(elem, 0);
+elem_chunk(elem, hasNext) = chunked(var(count, ~), hasNext) & elem{count};
+
+string                = string_short | string_long;
+string_short          = u4(8) & u4(var(count, ~)) & sized(count*8, char_string*);
+string_long           = u8(0x68) & string_chunk(1)* & string_chunk(0);
+string_chunk(hasNext) = chunked(var(count, ~), hasNext) & sized(count*8, char_string*);
+
+chunked(len, hasNext) = length(len * 2 + hasNext);
+length(l)             = ordered([
+                                    l >=                 0 & l <=               0x7f: uint( 7, l) & uint(1, 0x01);
+                                    l >=              0x80 & l <=             0x3fff: uint(14, l) & uint(2, 0x02);
+                                    l >=            0x4000 & l <=           0x1fffff: uint(21, l) & uint(3, 0x04);
+                                    l >=          0x200000 & l <=          0xfffffff: uint(28, l) & uint(4, 0x08);
+                                    l >=        0x10000000 & l <=        0x7ffffffff: uint(35, l) & uint(5, 0x10);
+                                    l >=       0x800000000 & l <=      0x3ffffffffff: uint(42, l) & uint(6, 0x20);
+                                    l >=     0x40000000000 & l <=    0x1ffffffffffff: uint(49, l) & uint(7, 0x40);
+                                    l >=   0x2000000000000 & l <=   0xffffffffffffff: uint(56, l) & uint(8, 0x80);
+                                    l >= 0x100000000000000 & l <= 0xffffffffffffffff: uint(64, l) & uint(8, 0x00);
+                                ]);
+
+# Primitives
+
+u1(v)             = uint(1, v);
+u2(v)             = uint(2, v);
+u3(v)             = uint(3, v);
+u4(v)             = uint(4, v);
+u5(v)             = uint(5, v);
+u8(v)             = uint(8, v);
+u16(v)            = ordered(uint(16, v));
+u32(v)            = ordered(uint(32, v));
+u64(v)            = ordered(uint(64, v));
+i8(v)             = sint(8, v);
+i16(v)            = ordered(sint(16, v));
+i32(v)            = ordered(sint(32, v));
+i64(v)            = ordered(sint(64, v));
+f16(v)            = ordered(sized(16, float(32, v))); # bfloat16
+f32(v)            = ordered(float(32, v));
+f64(v)            = ordered(float(64, v));
+id128(v)          = byte_order(msb, uint(128, v));
+char_string       = unicode(C,L,M,N,P,S,Z);

@@ -1,48 +1,41 @@
-Object Representation in Binary
-===============================
+ORB - Object Representation in Binary
+=====================================
 
-Orb is an extension of [BONJSON](https://github.com/kstenerud/bonjson/blob/main/bonjson.md) that adds many commonly used types.
+ORB is the binary representation of [ORT](ort.md).
+
+ORB is an extension of [BONJSON](https://github.com/kstenerud/bonjson/blob/main/bonjson.md) that adds support for the most requested things missing from JSON (and by extension, BONJSON):
+
+ * Floating point NaN and infinity values are allowed.
+ * [Timestamp](#timestamp) type
+ * [Identifier](#identifier) (UUID) type
+ * [Typed arrays](#typed-array) (including a byte array type)
+
+Any BONJSON document can also be read as an ORB document.
 
 
 
 WIP DRAFT
 ---------
 
-This is currently in early WIP draft form, and subject to extensive changes.
+This is currently a work-in-progress, and subject to change.
 
 
 
 Contents
 --------
 
-- [Object Representation in Binary](#object-representation-in-binary)
+- [ORB - Object Representation in Binary](#orb---object-representation-in-binary)
   - [WIP DRAFT](#wip-draft)
   - [Contents](#contents)
   - [Terms and Conventions](#terms-and-conventions)
-  - [Modifications](#modifications)
-    - [Allowed values](#allowed-values)
-    - [New Type Codes](#new-type-codes)
-    - [JSON-like text format](#json-like-text-format)
   - [Structure](#structure)
   - [Encoding](#encoding)
     - [Type Codes](#type-codes)
-  - [Timestamp](#timestamp)
-  - [UUID](#uuid)
-  - [Record Definition](#record-definition)
-  - [Record](#record)
-  - [Typed Array](#typed-array)
-  - [Marker](#marker)
-  - [Reference](#reference)
-  - [ORT - Object Representation in Text](#ort---object-representation-in-text)
-    - [Timestamp](#timestamp-1)
-    - [UUID](#uuid-1)
-    - [Record Definition](#record-definition-1)
-    - [Record](#record-1)
-    - [Typed Array](#typed-array-1)
-    - [Comment](#comment)
-    - [Marker](#marker-1)
-    - [Reference](#reference-1)
-    - [New literals](#new-literals)
+  - [New Types](#new-types)
+    - [Timestamp](#timestamp)
+    - [Identifier](#identifier)
+    - [Typed Array](#typed-array)
+  - [Formal Grammar](#formal-grammar)
   - [License](#license)
 
 
@@ -64,46 +57,12 @@ Terms and Conventions
 
 
 
-Modifications
--------------
-
-ORB should be considered an extension to BONJSON, adding more types and modifying the rules slightly. The BONJSON specification applies to ORB except where this specification overrides it:
-
-
-### Allowed values
-
-Floating point NaN and infinity values are allowed in ORB.
-
-
-### New Type Codes
-
-The following type codes (marked RESERVED in BONJSON) correspond to the new types in ORB:
-
-| Type Code | Payload                      | Type      | Description                                |
-| --------- | ---------------------------- | --------- | ------------------------------------------ |
-| 66        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)                    |
-| 67        | 128-bit UUID                 | Number    | [UUID](#uuid)                              |
-| 90        | Type, length, contents       | Container | [Typed array](#typed-array)                |
-| 91        |                              | Reference | [Marker](#marker)                          |
-| 92        |                              | Reference | [Reference](#reference)                    |
-| 97        |                              | Container | [Record start](#instance)                  |
-| 98        |                              | Container | [Record definition start](#type)           |
-
-
-### JSON-like text format
-
-ORB's textual form (ORT: Object Representation in Text) is mostly the same as JSON, with the following changes:
-
-* `/* */` and `//` can be used as comment delimiters
-* Commas are now considered "whitespace"
-* Values must be separated by at least one whitespace (key-value pairs only require a `:` in between them, with extra whitespace allowed)
-* Encodings for the new types
-
-
 Structure
 ---------
 
-ORB follows the same general structure as JSON, but allows more types, and also supports records and references.
+ORB has the same general structure as BONJSON and JSON, with more types.
+
+Except where this document specifies otherwise, ORB follows the same rules and structure as the [BONJSON specification](https://github.com/kstenerud/bonjson/blob/main/bonjson.md).
 
 **Document**:
 
@@ -111,17 +70,15 @@ ORB follows the same general structure as JSON, but allows more types, and also 
 
 **Value**:
 
-    ──┬─>───────────────┬─┬─>───────────┬─┬─>─[string]──────┬─>
-      ├─>─[definition]──┤ ╰─>─[marker]──╯ ├─>─[number]──────┤
-      ╰─<─<─<─<─<─<─<─<─╯                 ├─>─[object]──────┤
-                                          ├─>─[array]───────┤
-                                          ├─>─[boolean]─────┤
-                                          ├─>─[null]────────┤
-                                          ├─>─[timestamp]───┤
-                                          ├─>─[uuid]────────┤
-                                          ├─>─[typed array]─┤
-                                          ├─>─[record]──────┤
-                                          ╰─>─[reference]───╯
+    ──┬─>─[string]──────┬─>
+      ├─>─[number]──────┤
+      ├─>─[object]──────┤
+      ├─>─[array]───────┤
+      ├─>─[boolean]─────┤
+      ├─>─[null]────────┤
+      ├─>─[timestamp]───┤
+      ├─>─[identifier]──┤
+      ╰─>─[typed array]─╯
 
 **Object**:
 
@@ -137,21 +94,9 @@ ORB follows the same general structure as JSON, but allows more types, and also 
 
 **Typed Array**:
 
-    ──[begin typed array]─┬─>────────────┬─[end]──>
+    ──[begin typed array]─┬─>────────────┬─[end (implied)]──>
                           ├─>─[element]──┤
                           ╰─<─<─<─<─<─<──╯
-
-**Type**:
-
-    ──[begin type]─┬─>─────────┬─[end container]──>
-                   ├─>─[name]──┤
-                   ╰─<─<─<─<─<─╯
-
-**Instance**:
-
-    ──[begin instance]─┬─>──────────┬─[end container]──>
-                       ├─>─[value]──┤
-                       ╰─<─<─<─<─<──╯
 
 
 
@@ -163,207 +108,197 @@ Encoding
 
 Here is the complete table of type codes (including those defined in [BONJSON](https://github.com/kstenerud/bonjson/blob/main/bonjson.md)):
 
-| Type Code | Payload                      | Type      | Description                                |
-| --------- | ---------------------------- | --------- | ------------------------------------------ |
-| 00 - 64   |                              | Number    | Integers 0 through 100                     |
-| 65        |                              |           | RESERVED                                   |
-| 66        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)                    |
-| 67        | 128-bit UUID                 | Number    | [UUID](#uuid)                              |
-| 68        | Arbitrary length string      | String    | Long String                                |
-| 69        | Arbitrary length number      | Number    | Big Number                                 |
-| 6a        | 16-bit bfloat16 binary float | Number    | 16-bit float                               |
-| 6b        | 32-bit ieee754 binary float  | Number    | 32-bit float                               |
-| 6c        | 64-bit ieee754 binary float  | Number    | 64-bit float                               |
-| 6d        |                              | Null      | Null                                       |
-| 6e        |                              | Boolean   | False                                      |
-| 6f        |                              | Boolean   | True                                       |
-| 70 - 77   | Unsigned integer of n bytes  | Number    | Unsigned Integer                           |
-| 78 - 7f   | Signed integer of n bytes    | Number    | Signed Integer                             |
-| 80 - 8f   | String of n bytes            | String    | Short String                               |
-| 90        | Type, length, contents       | Container | [Typed array](#typed-array)                |
-| 91        |                              | Reference | [Marker](#marker)                          |
-| 92        |                              | Reference | [Reference](#reference)                    |
-| 93 - 96   |                              |           | RESERVED                                   |
-| 97        |                              | Container | [Instance start](#instance)                |
-| 98        |                              | Container | [Type start](#type)                        |
-| 99        |                              | Container | Array start                                |
-| 9a        |                              | Container | Object start                               |
-| 9b        |                              | Container | Container end                              |
-| 9c - ff   |                              | Number    | Integers -100 through -1                   |
+| Type Code | Payload                      | Type      | Description                 | New |
+| --------- | ---------------------------- | --------- | --------------------------- | --- |
+| 00 - 64   |                              | Number    | Integers 0 through 100      |     |
+| 65        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)     |  Y  |
+| 66        | 128-bit Identifier           | Number    | [Identifier](#identifier)   |  Y  |
+| 67        | Type, length, contents       | Container | [Typed array](#typed-array) |  Y  |
+| 68        | Arbitrary length string      | String    | Long String                 |     |
+| 69        | Arbitrary length number      | Number    | Big Number                  |     |
+| 6a        | 16-bit bfloat16 binary float | Number    | 16-bit float                |     |
+| 6b        | 32-bit ieee754 binary float  | Number    | 32-bit float                |     |
+| 6c        | 64-bit ieee754 binary float  | Number    | 64-bit float                |     |
+| 6d        |                              | Null      | Null                        |     |
+| 6e        |                              | Boolean   | False                       |     |
+| 6f        |                              | Boolean   | True                        |     |
+| 70 - 77   | Unsigned integer of n bytes  | Number    | Unsigned Integer            |     |
+| 78 - 7f   | Signed integer of n bytes    | Number    | Signed Integer              |     |
+| 80 - 8f   | String of n bytes            | String    | Short String                |     |
+| 90 - 99   |                              |           | RESERVED                    |     |
+| 9a        |                              | Container | Array start                 |     |
+| 9b        |                              | Container | Object start                |     |
+| 9c - ff   |                              | Number    | Integers -100 through -1    |     |
 
 
 
-Timestamp
+New Types
 ---------
 
-A timestamp is a 64-bit integer representing the number of nanoseconds elapsed since 00:00 UTC January 1st, 1900 (disregarding any human adjustments such as leap seconds). It can support timestamps up to the year 2484.
+### Timestamp
+
+A timestamp is a 64-bit unsigned integer representing the number of nanoseconds elapsed since 00:00 UTC January 1st, 1900 (disregarding any leap seconds, or the fact that UTC didn't exist in 1900).
+
+The actual anchor point of the timestamp is 00:00 UTC January 1st, 1970 (UNIX epoch) with a bias applied. Subtracting the bias value of 2208988800000000000 seconds `(70 years * 365 days + 17 leap days) * 24 hours * 60 minutes * 60 seconds * 1000000000 nanoseconds` from the timestamp yields a [UNIX epoch](https://en.wikipedia.org/wiki/Unix_time) timestamp (in nanoseconds).
+
+Nanosecond-precision values are supported from the year 1900 to the year 2484.
+
+**Example**:
+
+    TODO
 
 
+### Identifier
+
+An identifier is a 128-bit universally unique identifier, represented as binary per [RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html).
+
+**Example**:
+
+    TODO
 
 
-UUID
-----
+### Typed Array
 
-A UUID consists of 128 bits of data in big endian order, per RFC 9562 section 4.
+A typed array is a more compact representation of an array, where all elements are of the same type and size, and are written without type codes. This allows for efficient copying of data to/from a platform-native array.
 
+Typed arrays are encoded in chunks, like how BONJSON encodes [long strings](https://github.com/kstenerud/bonjson/blob/main/bonjson.md#long-string):
 
+The "typed array" type code is followed by the element's type code, and then chunks of elements.
 
-Record Definition
------------------
+    [typed array] [element type code] [chunk] ...
+        0x67              ...           ...   ...
 
-A record definition declares a new type of record, listing what the field names are. A [record](#record) will reference this definition and list out the corresponding values.
-
-A definition can be declared anywhere a value can be declared, and is considered "invisible" to the document structure (it is not considered a value and does not affect the document structure).
-
-A record definition begins with a globally unique (to the document) definition name, followed by a series of field names, and is terminated wuth an end container
-
-    [definition name] [field name] ... [end container]
-
-Definitions are not structurally significant in an of themselves. They are effectively invisible to the document structure, so a definition following an object name will not fulfil the role of the name's corresponding value.
-
-A definition **MUST NOT** contain duplicate field names.
-A definition's name **MUST** be unique to the entire document.
-A definition **MUST** be declared before any [instances](#instance) that reference it.
-
-
-
-Record
-------
-
-A record is a data instance that lists out the values corresponding to its [record definition](#record-definition), in the same order as the field names were defined.
-
-    [definition name] [field value] ... [end container]
-
-A record **MUST** contain exactly the same number of values as the number of field names in the [definition](#record-definition) it references (and in the same order).
-
-A record **MUST** not appear before the [definition](#record-definition) it references.
-
-
-
-Typed Array
------------
-
-A typed array is a more compact representation of an array, where all values are of the same type and size. This allows for efficient copying of data into a CPU-native array.
-
-The type code is followed by the element's type code, and then chunks of values.
-
-    [type code] [element type code] [chunk] ...
-
-Each chunk consists of a chunk header (containing a length field), followed by that many elements of data, until the end of a chunk where the continuation bit is 0:
+Each chunk consists of a chunk header (containing a length field), followed by that many elements (not necessarily bytes) of data, until the end of a chunk where the continuation bit is 0:
 
     [chunk header] [chunk data]
 
 The following type codes may be used as element types:
 
-| Type Code | Payload                      | Type      | Description                                |
-| --------- | ---------------------------- | --------- | ------------------------------------------ |
-| 66        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)                    |
-| 67        | 128-bit UUID                 | Number    | [UUID](#uuid)                              |
-| 6a        | 16-bit bfloat16 binary float | Number    | 16-bit float                               |
-| 6b        | 32-bit ieee754 binary float  | Number    | 32-bit float                               |
-| 6c        | 64-bit ieee754 binary float  | Number    | 64-bit float                               |
-| 70 - 77   | Unsigned integer of n bytes  | Number    | Unsigned Integer                           |
-| 78 - 7f   | Signed integer of n bytes    | Number    | Signed Integer                             |
+| Type Codes     | Payload                            | Type   | Description               |
+| -------------- | ---------------------------------- | ------ | ------------------------- |
+| 66             | 64 bit nanoseconds                 | Time   | [Timestamp](#timestamp)   |
+| 67             | 128 bit identifier                 | Number | [Identifier](#identifier) |
+| 6a, 6b, 6c     | 16, 32, 64 bit float               | Number | Floating point            |
+| 70, 71, 73, 77 | 8, 16, 32, 64 bit unsigned integer | Number | Unsigned integer          |
+| 78, 79, 7b, 7f | 8, 16, 32, 64 bit signed integer   | Number | Signed integer            |
 
-TODO: Allow fixed-length strings (1-15 bytes)?
+**Examples**:
 
-
-
-Marker
-------
-
-TODO: Keep this?
-
-A marker marks the value following it with an identifier that can be [referenced](#reference) later.
-
-The marker itself is not a value, and is thus invisible structurally.
+    TODO
 
 
 
-Reference
----------
+Formal Grammar
+--------------
 
-TODO: Keep this?
+```dogma
+dogma_v1 utf-8
+- identifier  = orb_v1
+- description = Object Representation in Binary, version 1
+- dogma       = https://github.com/kstenerud/dogma/blob/master/v1/dogma_v1.0.md
 
-A reference is a value placeholder that refers to a [previously marked value](#marker).
+document          = byte_order(lsb, ordered_document);
+ordered_document  = value;
 
-A reference **MUST** refer to a reference made earlier in the document (no forward referencing).
+value             = string | number | boolean | null | object | array | timestamp | uuid | record | typed_array | reference;
+key               = string;
 
+# Types
 
+array             = u8(0x99) & value* & end_container;
+object            = u8(0x9a) & (string & value)* & end_container;
+end_container     = u8(0x9b);
 
+number            = int_small | int_unsigned | int_signed | float_16 | float_32 | float_64 | big_number;
+int_small         = i8(-100~100);
+int_unsigned      = u4(7) & u1(0) & u3(var(count, ~)) & ordered(uint((count+1)*8, ~));
+int_signed        = u4(7) & u1(1) & u3(var(count, ~)) & ordered(sint((count+1)*8, ~));
+float_16          = u8(0x6a) & f16(~);
+float_32          = u8(0x6b) & f32(~);
+float_64          = u8(0x6c) & f64(~);
+big_number        = u8(0x69)
+                  & var(header, big_number_header)
+                  & [
+                        header.sig_length > 0: ordered(sint(header.exp_length*8, ~))
+                                             & ordered(uint(header.sig_length*8, ~))
+                                             ;
+                    ]
+                  ;
+big_number_header = u5(var(sig_length, ~)) & u2(var(exp_length, ~)) & u1(var(sig_negative, ~));
+timestamp         = u8(0x66) & u64(~);
+uuid              = u8(0x67) & id128(~); # Note: Big endian
+marker            = u8(0x91) & identifier;
+reference         = u8(0x92) & identifier;
+record            = u8(0x97) & identifier & value* & end_container;
+record_definition = u8(0x98) & identifier & key* & end_container;
 
-ORT - Object Representation in Text
------------------------------------
+boolean           = true | false;
+false             = u8(0x6e);
+true              = u8(0x6f);
 
-ORT is the textual representation of ORB.
+null              = u8(0x6d);
 
-ORT follows most of the conventions of JSON, with some extra types, and some modifications:
-- Values are separated by one or more whitespace characters.
-- Commas are considered whitespace.
-- Strings that don't contain structural characters or match reserved literals can be used without quotes?
+typed_array       = u8_array | u16_array | u32_array | u64_array
+                  | s8_array | s16_array | s32_array | s64_array
+                  | f16_array | f32_array | f64_array
+                  | ts_array
+                  | id_array
+                  ;
+u8_array          = array_type(0x70, u8(~));
+u16_array         = array_type(0x71, u16(~));
+u32_array         = array_type(0x73, u32(~));
+u64_array         = array_type(0x77, u64(~));
+s8_array          = array_type(0x78, s8(~));
+s16_array         = array_type(0x79, s16(~));
+s32_array         = array_type(0x7b, s32(~));
+s64_array         = array_type(0x7f, s64(~));
+f16_array         = array_type(0x6a, f16(~));
+f32_array         = array_type(0x6b, f32(~));
+f64_array         = array_type(0x6c, f64(~));
+ts_array          = array_type(0x66, u64(~));
+id_array          = array_type(0x67, id128(~)); # Note: Big endian
+array_type(elem_type, elem) = u8(0x90) & elem_type & elem_chunk(elem, 1)* & elem_chunk(elem, 0);
+elem_chunk(elem, hasNext) = chunked(var(count, ~), hasNext) & elem{count};
 
-Any valid JSON document can be read as an ORT document.
+string                = string_short | string_long;
+string_short          = u4(8) & u4(var(count, ~)) & sized(count*8, char_string*);
+string_long           = u8(0x68) & string_chunk(1)* & string_chunk(0);
+string_chunk(hasNext) = chunked(var(count, ~), hasNext) & sized(count*8, char_string*);
 
+chunked(len, hasNext) = length(len * 2 + hasNext);
+length(l)             = ordered([
+                                    l >=                 0 & l <=               0x7f: uint( 7, l) & uint(1, 0x01);
+                                    l >=              0x80 & l <=             0x3fff: uint(14, l) & uint(2, 0x02);
+                                    l >=            0x4000 & l <=           0x1fffff: uint(21, l) & uint(3, 0x04);
+                                    l >=          0x200000 & l <=          0xfffffff: uint(28, l) & uint(4, 0x08);
+                                    l >=        0x10000000 & l <=        0x7ffffffff: uint(35, l) & uint(5, 0x10);
+                                    l >=       0x800000000 & l <=      0x3ffffffffff: uint(42, l) & uint(6, 0x20);
+                                    l >=     0x40000000000 & l <=    0x1ffffffffffff: uint(49, l) & uint(7, 0x40);
+                                    l >=   0x2000000000000 & l <=   0xffffffffffffff: uint(56, l) & uint(8, 0x80);
+                                    l >= 0x100000000000000 & l <= 0xffffffffffffffff: uint(64, l) & uint(8, 0x00);
+                                ]);
 
-### Timestamp
+# Primitives
 
-Use RFC 3339
-
-### UUID
-
-RFC 9562
-
-### Record Definition
-
-`@my_record<name age score>`
-
-### Record
-
-`@my_record{"bill" 40 85923395}`
-
-### Typed Array
-
-`@type[1 2 3]`
-
-Where type is:
-- `u8` to `u64`
-- `i8` to `i64`
-- `timestamp`
-- `uuid`
-- `f16`, `f32`, `f64`
-
-### Comment
-
+u1(v)             = uint(1, v);
+u2(v)             = uint(2, v);
+u3(v)             = uint(3, v);
+u4(v)             = uint(4, v);
+u5(v)             = uint(5, v);
+u8(v)             = uint(8, v);
+u16(v)            = ordered(uint(16, v));
+u32(v)            = ordered(uint(32, v));
+u64(v)            = ordered(uint(64, v));
+i8(v)             = sint(8, v);
+i16(v)            = ordered(sint(16, v));
+i32(v)            = ordered(sint(32, v));
+i64(v)            = ordered(sint(64, v));
+f16(v)            = ordered(sized(16, float(32, v))); # bfloat16
+f32(v)            = ordered(float(32, v));
+f64(v)            = ordered(float(64, v));
+id128(v)          = byte_order(msb, uint(128, v));
+char_string       = unicode(C,L,M,N,P,S,Z);
 ```
-/* */
-//
-```
-
-### Marker
-
-`&remember_me:{"name": "Mighty Thor" "age": 1000}`
-
-
-### Reference
-
-`{"Thor": $remember_me}`
-
-
-Nested comments: Simple string search for */ to terminate, or /* to initiate the next nesting level. If strings contain confounding chars, too bad.
-
-### New literals
-
-- `nan`
-- `inf` / `-inf`
-
-So all literals will be:
-
-- `true`
-- `false`
-- `null`
-- `nan`
-- `inf`
-- `-inf`
 
 
 
@@ -372,4 +307,4 @@ License
 
 Copyright (c) 2025 Karl Stenerud. All rights reserved.
 
-Distributed under the [Creative Commons Attribution License](https://creativecommons.org/licenses/by/4.0/legalcode) ([license deed](https://creativecommons.org/licenses/by/4.0).
+Distributed under the [Creative Commons Attribution License](https://creativecommons.org/licenses/by/4.0/legalcode) ([license deed](https://creativecommons.org/licenses/by/4.0)).
