@@ -266,6 +266,8 @@ An identifier uniquely identifies a record type in the current document.
 
     [string chunk] ...
 
+TODO: Require identifier to be a single chunk
+
 ```dogma
 identifier             = char_identifier_first & char_identifier_next*;
 char_identifier_first  = unicode(L,N) | '_';
