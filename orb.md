@@ -141,7 +141,7 @@ Here is the complete table of type codes (including those defined in [BONJSON](h
 | --------- | ---------------------------- | --------- | --------------------------- | --- |
 | 00 - 64   |                              | Number    | Integers 0 through 100      |     |
 | 65        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)     |  Y  |
-| 66        | 128-bit identifier           | Number    | [UUID](#uuid)               |  Y  |
+| 66        | 128-bit UUID                 | Number    | [UUID](#uuid)               |  Y  |
 | 67        |                              |           | Plane 0x67                  |  Y  |
 | 68        | Arbitrary length string      | String    | Long String                 |     |
 | 69        | Arbitrary length number      | Number    | Big Number                  |     |
@@ -165,24 +165,20 @@ Plane 0x67:
 
 | Type Code | Payload                        | Type      | Description                       | New |
 | --------- | ------------------------------ | --------- | --------------------------------- | --- |
-| xx        | array: 8-bit signed integer    | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 16-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 32-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 64-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 8-bit unsigned integer  | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 16-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 32-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 64-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 16-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 32-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 64-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 64-bit nanoseconds      | Container | [Typed Array](#typed-array)       |  Y  |
-| xx        | array: 128-bit identifier      | Container | [Typed Array](#typed-array)       |  Y  |
-| 98        | Identifier                     | Container | [Record Type start](#record-type) |  Y  |
-
-TODO: assign type codes
-- Use short array forms?
-  - Probably not, since these are to save space and will likely be long.
+| 00        | array: 8-bit signed integer    | Container | [Typed Array](#typed-array)       |  Y  |
+| 01        | array: 16-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
+| 02        | array: 32-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
+| 03        | array: 64-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
+| 04        | array: 8-bit unsigned integer  | Container | [Typed Array](#typed-array)       |  Y  |
+| 05        | array: 16-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
+| 06        | array: 32-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
+| 07        | array: 64-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
+| 08        | array: 16-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
+| 09        | array: 32-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
+| 0a        | array: 64-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
+| 0b        | array: 64-bit nanoseconds      | Container | [Typed Array](#typed-array)       |  Y  |
+| 0c        | array: 128-bit uuid            | Container | [Typed Array](#typed-array)       |  Y  |
+| ff        | Identifier                     | Container | [Record Type start](#record-type) |  Y  |
 
 
 
@@ -248,7 +244,7 @@ A record type defines a new object (dictionary) type.
 A record type begins with an [identifier](#identifier) (that **MUST** be unique among all record types in the document), followed by a list of keys, and finally a `container end` (`0x9b`):
 
     [record type] [identifier] (key ...) [container end]
-      0x67 0x98      ...          ...          0x9b
+      0x67 0xff      ...          ...          0x9b
 
 Record types **MUST** be placed at the beginning of a document.
 
@@ -266,14 +262,6 @@ An identifier uniquely identifies a record type in the current document.
 
     [string chunk] ...
 
-TODO: Require identifier to be a single chunk
-
-```dogma
-identifier             = char_identifier_first & char_identifier_next*;
-char_identifier_first  = unicode(L,N) | '_';
-char_identifier_next   = unicode(Cf,L,M,N) | '_' | '.' | '-';
-```
-
 
 ### Record
 
@@ -286,6 +274,8 @@ A record can be thought of as a custom type. It is first defined by a [record ty
     [record] [identifier] (key ...) [container end]
       0x98      ...          ...          0x9b
 
+A record **MUST** contain exactly the same number of values as the [record type](#record-type) contains keys.
+
 The values in a record **MUST** match the key order defined in the corresponding [record type](#record-type).
 
 
@@ -295,9 +285,11 @@ Other Modifications
 
 ### Object
 
-In addition to strings, an object in ORB may use integer (up to signed 64 bits in size), [UUID](#uuid), and [timestamp](#timestamp) types as keys.
+In addition to strings, an object in ORB may use signed integer (up to signed 64 bits in size), [UUID](#uuid), and [timestamp](#timestamp) types as keys.
 
 All keys in an object **MUST** be of the same type (all signed integers, all UUIDs, all timestamps, or all strings).
+
+**Note**: "signed integer" keys **CAN** be stored as unsigned integer types if they don't exceed 7 bytes in length (to prevent accidental sign overflow).
 
 
 
@@ -311,21 +303,25 @@ dogma_v1 utf-8
 - dogma       = https://github.com/kstenerud/dogma/blob/master/v1/dogma_v1.0.md
 
 document          = byte_order(lsb, ordered_document);
-ordered_document  = value;
+ordered_document  = record_type* & value;
 
-value             = string | number | boolean | null | object | array | timestamp | uuid | record | typed_array | reference;
-key               = string;
+value             = string | number | boolean | null | object | array | timestamp | uuid | record | typed_array | record;
+key               = string | uuid | timestamp | int_signed(~) | int_unsigned(~7);
 
 # Types
+
+record_type       = u8(0x67) & u8(0xff) & identifier & key* & end_container;
+record            = u8(0x98) & identifier & value* & end_container;
+identifier        = string_chunk(1)* & string_chunk(0);
 
 array             = u8(0x99) & value* & end_container;
 object            = u8(0x9a) & (string & value)* & end_container;
 end_container     = u8(0x9b);
 
-number            = int_small | int_unsigned | int_signed | float_16 | float_32 | float_64 | big_number;
+number            = int_small | int_unsigned(~) | int_signed(~) | float_16 | float_32 | float_64 | big_number;
 int_small         = i8(-100~100);
-int_unsigned      = u4(7) & u1(0) & u3(var(count, ~)) & ordered(uint((count+1)*8, ~));
-int_signed        = u4(7) & u1(1) & u3(var(count, ~)) & ordered(sint((count+1)*8, ~));
+int_unsigned(size) = u4(7) & u1(0) & u3(size-1) & ordered(uint((size)*8, ~));
+int_signed(size)   = u4(7) & u1(1) & u3(size-1) & ordered(sint((size)*8, ~));
 float_16          = u8(0x6a) & f16(~);
 float_32          = u8(0x6b) & f32(~);
 float_64          = u8(0x6c) & f64(~);
@@ -341,7 +337,6 @@ big_number_header = u5(var(sig_length, ~)) & u2(var(exp_length, ~)) & u1(var(sig
 timestamp         = u8(0x66) & u64(~);
 uuid              = u8(0x67) & id128(~); # Note: Big endian
 marker            = u8(0x91) & identifier;
-reference         = u8(0x92) & identifier;
 record            = u8(0x97) & identifier & value* & end_container;
 record_definition = u8(0x98) & identifier & key* & end_container;
 
@@ -357,20 +352,20 @@ typed_array       = u8_array | u16_array | u32_array | u64_array
                   | ts_array
                   | id_array
                   ;
-u8_array          = array_type(0x70, u8(~));
-u16_array         = array_type(0x71, u16(~));
-u32_array         = array_type(0x73, u32(~));
-u64_array         = array_type(0x77, u64(~));
-s8_array          = array_type(0x78, s8(~));
-s16_array         = array_type(0x79, s16(~));
-s32_array         = array_type(0x7b, s32(~));
-s64_array         = array_type(0x7f, s64(~));
-f16_array         = array_type(0x6a, f16(~));
-f32_array         = array_type(0x6b, f32(~));
-f64_array         = array_type(0x6c, f64(~));
-ts_array          = array_type(0x66, u64(~));
-id_array          = array_type(0x67, id128(~)); # Note: Big endian
-array_type(elem_type, elem) = u8(0x90) & elem_type & elem_chunk(elem, 1)* & elem_chunk(elem, 0);
+s8_array          = array_type(0x00, s8(~));
+s16_array         = array_type(0x01, s16(~));
+s32_array         = array_type(0x02, s32(~));
+s64_array         = array_type(0x03, s64(~));
+u8_array          = array_type(0x04, u8(~));
+u16_array         = array_type(0x05, u16(~));
+u32_array         = array_type(0x06, u32(~));
+u64_array         = array_type(0x07, u64(~));
+f16_array         = array_type(0x08, f16(~));
+f32_array         = array_type(0x09, f32(~));
+f64_array         = array_type(0x0a, f64(~));
+ts_array          = array_type(0x0b, u64(~));
+id_array          = array_type(0x0c, id128(~)); # Note: Big endian
+array_type(elem_type, elem) = u8(0x67) & elem_type & elem_chunk(elem, 1)* & elem_chunk(elem, 0);
 elem_chunk(elem, hasNext) = chunked(var(count, ~), hasNext) & elem{count};
 
 string                = string_short | string_long;

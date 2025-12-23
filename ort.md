@@ -345,15 +345,19 @@ dogma_v1 utf-8
 - description = Object Representation in Text, version 1
 - dogma       = https://github.com/kstenerud/dogma/blob/master/v1/dogma_v1.0.md
 
-document               = value;
+document               = (WSC* & record_type)* value;
 
-value                  = WSC* & (string | number | boolean | null | object | array | typed_array | timestamp | id) & WSC*;
-key                    = WSC* & string & WSC*;
+value                  = WSC* & (string | number | boolean | null | object | array | typed_array | timestamp | uuid) & WSC*;
+key                    = WSC* & (string | integer | timestamp | uuid) & WSC*;
+
+record_type            ='@' & identifier & container('(', key, ')');
+record                 ='@' & identifier & container('{', value, '}');
+identifier             = char_identifier_first & char_identifier_next*;
 
 array                  = container('[', value, ']');
 object                 = container('{', key_value, '}');
 boolean                = true | false;
-id                     = digit_0_f{8} & '-'
+uuid                   = digit_0_f{8} & '-'
                        & digit_0_f{4} & '-'
                        & digit_0_f{4} & '-'
                        & digit_0_f{4} & '-'
@@ -388,12 +392,12 @@ minute                 = string_num_2(0~59);
 second                 = string_num_2(0~60);
 subsecond              = fractional_dec;
 
-typed_array            = integer_array | uinteger_array | float_array | timestamp_array | id_array;
+typed_array            = integer_array | uinteger_array | float_array | timestamp_array | uuid_array;
 integer_array          = container('@i' & ('8' | '16' | '32' | '64') & '[', integer, ']');
 uinteger_array         = container('@u' & ('8' | '16' | '32' | '64') & '[', uinteger, ']');
 float_array            = container('@f' & ('16' | '32' | '64') & '[', number, ']');
 timestamp_array        = container('@ts' & '[', timestamp, ']');
-id_array               = container('@id' & '[', id, ']');
+uuid_array             = container('@uuid' & '[', uuid, ']');
 
 comment                = comment_single_line | comment_multi_line;
 comment_single_line    = "//" & (char* ! LINE_END) & LINE_END;
