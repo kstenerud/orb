@@ -7,12 +7,14 @@ ORT is an extension of [JSON](https://www.rfc-editor.org/rfc/rfc8259) that adds 
 
  * Floating point NaN and infinity values are allowed
  * [Timestamp](#timestamp) type
- * [Identifier](#identifier) (UUID) type
+ * [UUID](#uuid) (UUID) type
  * [Typed arrays](#typed-array) (including a byte array type)
+ * [Records](#record)
  * Comments
  * Hexadecimal notation
  * The comma character (`,`) is now considered "whitespace"
  * A new Unicode escape sequence that supports the entire codepoint range
+ * Objects can use more types as keys
 
 Any JSON document following the stricter rules of [BONJSON](https://github.com/kstenerud/bonjson/blob/main/bonjson.md) (no duplicate keys, UTF-8 only, no invalid UTF-8 characters) can also be read as an ORT document.
 
@@ -35,9 +37,13 @@ Contents
   - [Structure](#structure)
   - [New Types](#new-types)
     - [Timestamp](#timestamp)
-    - [Identifier](#identifier)
+    - [UUID](#uuid)
     - [Typed Array](#typed-array)
+    - [Record Type](#record-type)
+      - [Identifier](#identifier)
+    - [Record](#record)
   - [Other Modifications](#other-modifications)
+    - [Object](#object)
     - [Comment](#comment)
     - [Unicode Codepoint Escape Sequence](#unicode-codepoint-escape-sequence)
     - [New literals](#new-literals)
@@ -75,7 +81,9 @@ Except where this document specifies otherwise, ORT follows the textual format o
 
 **Document**:
 
-    ──[value]──>
+    ──┬─>────────────────┬──[value]──>
+      ├─>─[record type]──┤
+      ╰─<─<─<─<─<─<─<─<──╯
 
 **Value**:
 
@@ -86,14 +94,22 @@ Except where this document specifies otherwise, ORT follows the textual format o
       ├─>─[boolean]─────┤
       ├─>─[null]────────┤
       ├─>─[timestamp]───┤
-      ├─>─[identifier]──┤
+      ├─>─[uuid]--─----─┤
+      ├─>─[record]--─--─┤
       ╰─>─[typed array]─╯
+
+**Key**:
+
+    ──┬─>─[string]─────────┬─>
+      ├─>─[signed integer]─┤
+      ├─>─[timestamp]──────┤
+      ╰─>─[uuid]───────────╯
 
 **Object**:
 
-    ──[begin object]─┬─>────────────────────┬─[end container]──>
-                     ├─>─[string]──[value]──┤
-                     ╰─<─<─<─<─<─<─<─<─<─<──╯
+    ──[begin object]─┬─>─────────────────┬─[end container]──>
+                     ├─>─[key]──[value]──┤
+                     ╰─<─<─<─<─<─<─<─<─<─╯
 
 **Array**:
 
@@ -101,11 +117,23 @@ Except where this document specifies otherwise, ORT follows the textual format o
                     ├─>─[value]──┤
                     ╰─<─<─<─<─<──╯
 
+**Record Type**:
+
+    ──[identifier]─┬─>────────┬─[end container]──>
+                   ├─>─[key]──┤
+                   ╰─<─<─<─<──╯
+
+**Record**:
+
+    ──[identifier]─┬─>──────────┬─[end container]──>
+                   ├─>─[value]──┤
+                   ╰─<─<─<─<─<──╯
+
 **Typed Array**:
 
-    ──[begin typed array]─┬─>────────────┬─[end container]──>
-                          ├─>─[element]──┤
-                          ╰─<─<─<─<─<─<──╯
+    ──[type and size]─┬─>────────────┬─[end container]──>
+                      ├─>─[element]──┤
+                      ╰─<─<─<─<─<─<──╯
 
 
 
@@ -116,21 +144,21 @@ New Types
 
 Timestamps are represented as text per [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339), with a subsecond precision supported to the nanosecond.
 
-**Note**: Only timestamps in the years ranging from 1900 to 2484 can be represented in [ORB](orb.md).
+**Note**: Timestamps **MUST** be within the years from 1900 to 2484 (inclusive) because this is the date range supported by [ORB](orb.md).
 
 **Example**: `1985-04-12T23:20:50.521422010Z`
 
 
-### Identifier
+### UUID
 
-An identifier is a 128-bit universally unique identifier, represented as text per [RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html).
+A UUID is a 128-bit universally unique identifier, represented as text per [RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html).
 
 **Example**: `2489E9AD-2EE2-8E00-8EC9-32D5F69181C0`
 
 
 ### Typed Array
 
-A typed array is a more compact (in binary) representation of an array, where all values are of the same type and size.
+A typed array is a more compact (in binary) representation of an array, where all elements are of the same type and size.
 
 Typed arrays look like regular JSON array notation, except that they are prepended with type information like so: `@some_type[ ... ]`
 
@@ -139,10 +167,10 @@ The following types are supported:
  * Signed Integers: `i8`, `i16`, `i32`, `i64`
  * Unsigned Integers: `u8`, `u16`, `u32`, `u64`
  * Timestamp: `ts`
- * Identifier: `id`
+ * UUID: `uuid`
  * Floating Point: `f16`, `f32`, `f64`
 
-All elements **MUST** fit into the array's element type without data loss (other than the normal loss of floating point precision that is to be expected when converting from decimal string representation to binary floating point).
+All elements **MUST** fit into the array's element type without data loss (other than the normal loss of floating point precision that is to be expected when converting from string floating point representation to binary floating point).
 
 **Examples**:
 
@@ -151,9 +179,82 @@ All elements **MUST** fit into the array's element type without data loss (other
  * `@ts[2020-01-18T21:05:44.985929934Z 2020-01-18T21:05:46.995254234Z 2020-01-18T21:05:49.004576523Z]`
 
 
+### Record Type
+
+A record type defines a new object (dictionary) type.
+
+A record type begins with an [identifier](#identifier) (that **MUST** be unique among all record types in the document), followed by a list of keys.
+
+```ort
+@identifier( ... )
+```
+
+Record types **MUST** be placed at the beginning of a document.
+
+**Example**:
+
+```ort
+@my_type("key a" "key b")
+@3d("x" "y" "z")
+{
+    "a 3d coord": @3d{1 0 0}
+    "another 3d coord": @3d{2.5 5 5}
+    "a record value": @my_type{"hello" "world"}
+    "a string value": "some value"
+}
+```
+
+This document is equivalent in its final produced contents to:
+
+```ort
+{
+    "a 3d coord": {"x":1 "y":0 "z":0}
+    "another 3d coord": {"x":2.5 "y":5 "z":5}
+    "a record value": {"key a":"hello" "key b":"world"}
+    "a string value": "some value"
+}
+```
+
+#### Identifier
+
+An identifier uniquely identifies a record type in the current document.
+
+ * It **MUST** be a valid UTF-8 string containing only codepoints of Unicode categories Cf, L, M, N, or codepoints '_', '.', or '-'.
+ * It **MUST** begin with either a letter, number, or an underscore '_' (and therefore **CANNOT** be empty).
+ * Comparisons are **case sensitive**.
+
+```dogma
+identifier             = char_identifier_first & char_identifier_next*;
+char_identifier_first  = unicode(L,N) | '_';
+char_identifier_next   = unicode(Cf,L,M,N) | '_' | '.' | '-';
+```
+
+
+### Record
+
+A record is an instance of a [record type](#record-type), containing the values that correspond to the keys defined in the type.
+
+A record begins with an [identifier](#identifier) that **MUST** match an [identifier](#identifier) for a [record type](#record-type) that has been defined earlier in the document.
+
+A record can be thought of as a custom type. It is first defined by a [record type](#record-type), after which any number of records may be present in the document.
+
+```ort
+@identifier{ ... }
+```
+
+The values in a record **MUST** match the key order defined in the corresponding [record type](#record-type).
+
+
 
 Other Modifications
 -------------------
+
+### Object
+
+In addition to strings, an object in ORT may use signed integer (up to 64 bits in size), [UUID](#uuid), and [timestamp](#timestamp) types as keys.
+
+All keys in an object **MUST** be of the same type (all signed integers, all UUIDs, all timestamps, or all strings).
+
 
 ### Comment
 
@@ -230,6 +331,8 @@ Numeric types can be written using hexadecimal notation.
   "hex float": 0x1.15fc14727b686p-43
 }
 ```
+
+Encoders **MUST** output in decimal notation by default.
 
 
 

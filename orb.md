@@ -9,6 +9,8 @@ ORB is an extension of [BONJSON](https://github.com/kstenerud/bonjson/blob/main/
  * [Timestamp](#timestamp) type
  * [Identifier](#identifier) (UUID) type
  * [Typed arrays](#typed-array) (including a byte array type)
+ * [Records](#record)
+ * Objects can use more types as keys
 
 Any BONJSON document can also be read as an ORB document.
 
@@ -33,8 +35,13 @@ Contents
     - [Type Codes](#type-codes)
   - [New Types](#new-types)
     - [Timestamp](#timestamp)
-    - [Identifier](#identifier)
+    - [UUID](#uuid)
     - [Typed Array](#typed-array)
+    - [Record Type](#record-type)
+      - [Identifier](#identifier)
+    - [Record](#record)
+  - [Other Modifications](#other-modifications)
+    - [Object](#object)
   - [Formal Grammar](#formal-grammar)
   - [License](#license)
 
@@ -66,7 +73,9 @@ Except where this document specifies otherwise, ORB follows the same rules and s
 
 **Document**:
 
-    ──[value]──>
+    ──┬─>────────────────┬──[value]──>
+      ├─>─[record type]──┤
+      ╰─<─<─<─<─<─<─<─<──╯
 
 **Value**:
 
@@ -77,14 +86,22 @@ Except where this document specifies otherwise, ORB follows the same rules and s
       ├─>─[boolean]─────┤
       ├─>─[null]────────┤
       ├─>─[timestamp]───┤
-      ├─>─[identifier]──┤
+      ├─>─[uuid]--─----─┤
+      ├─>─[record]--─--─┤
       ╰─>─[typed array]─╯
+
+**Key**:
+
+    ──┬─>─[string]─────────┬─>
+      ├─>─[signed integer]─┤
+      ├─>─[timestamp]──────┤
+      ╰─>─[uuid]───────────╯
 
 **Object**:
 
-    ──[begin object]─┬─>────────────────────┬─[end container]──>
-                     ├─>─[string]──[value]──┤
-                     ╰─<─<─<─<─<─<─<─<─<─<──╯
+    ──[begin object]─┬─>─────────────────┬─[end container]──>
+                     ├─>─[key]──[value]──┤
+                     ╰─<─<─<─<─<─<─<─<─<─╯
 
 **Array**:
 
@@ -92,11 +109,23 @@ Except where this document specifies otherwise, ORB follows the same rules and s
                     ├─>─[value]──┤
                     ╰─<─<─<─<─<──╯
 
+**Record Type**:
+
+    ──[identifier]─┬─>────────┬─[end container]──>
+                   ├─>─[key]──┤
+                   ╰─<─<─<─<──╯
+
+**Record**:
+
+    ──[identifier]─┬─>──────────┬─[end container]──>
+                   ├─>─[value]──┤
+                   ╰─<─<─<─<─<──╯
+
 **Typed Array**:
 
-    ──[begin typed array]─┬─>────────────┬─[end (implied)]──>
-                          ├─>─[element]──┤
-                          ╰─<─<─<─<─<─<──╯
+    ──[type and size]─┬─>────────────┬─[end container]──>
+                      ├─>─[element]──┤
+                      ╰─<─<─<─<─<─<──╯
 
 
 
@@ -112,8 +141,8 @@ Here is the complete table of type codes (including those defined in [BONJSON](h
 | --------- | ---------------------------- | --------- | --------------------------- | --- |
 | 00 - 64   |                              | Number    | Integers 0 through 100      |     |
 | 65        | 64-bit nanoseconds           | Time      | [Timestamp](#timestamp)     |  Y  |
-| 66        | 128-bit Identifier           | Number    | [Identifier](#identifier)   |  Y  |
-| 67        | Type, length, contents       | Container | [Typed array](#typed-array) |  Y  |
+| 66        | 128-bit identifier           | Number    | [UUID](#uuid)               |  Y  |
+| 67        |                              |           | Plane 0x67                  |  Y  |
 | 68        | Arbitrary length string      | String    | Long String                 |     |
 | 69        | Arbitrary length number      | Number    | Big Number                  |     |
 | 6a        | 16-bit bfloat16 binary float | Number    | 16-bit float                |     |
@@ -125,10 +154,35 @@ Here is the complete table of type codes (including those defined in [BONJSON](h
 | 70 - 77   | Unsigned integer of n bytes  | Number    | Unsigned Integer            |     |
 | 78 - 7f   | Signed integer of n bytes    | Number    | Signed Integer              |     |
 | 80 - 8f   | String of n bytes            | String    | Short String                |     |
-| 90 - 99   |                              |           | RESERVED                    |     |
-| 9a        |                              | Container | Array start                 |     |
-| 9b        |                              | Container | Object start                |     |
+| 90 - 97   |                              |           | RESERVED                    |     |
+| 98        | Identifier                   | Container | [Record start](#record)     |  Y  |
+| 99        |                              | Container | Array start                 |     |
+| 9a        |                              | Container | Object start                |     |
+| 9b        |                              | Container | Container end               |     |
 | 9c - ff   |                              | Number    | Integers -100 through -1    |     |
+
+Plane 0x67:
+
+| Type Code | Payload                        | Type      | Description                       | New |
+| --------- | ------------------------------ | --------- | --------------------------------- | --- |
+| xx        | array: 8-bit signed integer    | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 16-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 32-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 64-bit signed integer   | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 8-bit unsigned integer  | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 16-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 32-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 64-bit unsigned integer | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 16-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 32-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 64-bit binary float     | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 64-bit nanoseconds      | Container | [Typed Array](#typed-array)       |  Y  |
+| xx        | array: 128-bit identifier      | Container | [Typed Array](#typed-array)       |  Y  |
+| 98        | Identifier                     | Container | [Record Type start](#record-type) |  Y  |
+
+TODO: assign type codes
+- Use short array forms?
+  - Probably not, since these are to save space and will likely be long.
 
 
 
@@ -148,9 +202,9 @@ Nanosecond-precision values are supported from the year 1900 to the year 2484.
     TODO
 
 
-### Identifier
+### UUID
 
-An identifier is a 128-bit universally unique identifier, represented as binary per [RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html).
+A UUID is a 128-bit universally unique identifier, represented as binary per [RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html).
 
 **Example**:
 
@@ -185,6 +239,63 @@ The following type codes may be used as element types:
 **Examples**:
 
     TODO
+
+
+### Record Type
+
+A record type defines a new object (dictionary) type.
+
+A record type begins with an [identifier](#identifier) (that **MUST** be unique among all record types in the document), followed by a list of keys, and finally a `container end` (`0x9b`):
+
+    [record type] [identifier] (key ...) [container end]
+      0x67 0x98      ...          ...          0x9b
+
+Record types **MUST** be placed at the beginning of a document.
+
+**Example**:
+
+TODO
+
+#### Identifier
+
+An identifier uniquely identifies a record type in the current document.
+
+ * It **MUST** be a valid UTF-8 string containing only codepoints of Unicode categories Cf, L, M, N, or codepoints '_', '.', or '-'.
+ * It **MUST** begin with either a letter, number, or an underscore '_' (and therefore **CANNOT** be empty).
+ * Comparisons are **case sensitive**.
+
+    [string chunk] ...
+
+```dogma
+identifier             = char_identifier_first & char_identifier_next*;
+char_identifier_first  = unicode(L,N) | '_';
+char_identifier_next   = unicode(Cf,L,M,N) | '_' | '.' | '-';
+```
+
+
+### Record
+
+A record is an instance of a [record type](#record-type), containing the values that correspond to the keys defined in the type.
+
+A record begins with an [identifier](#identifier) that **MUST** match an [identifier](#identifier) for a [record type](#record-type) that has been defined earlier in the document.
+
+A record can be thought of as a custom type. It is first defined by a [record type](#record-type), after which any number of records may be present in the document.
+
+    [record] [identifier] (key ...) [container end]
+      0x98      ...          ...          0x9b
+
+The values in a record **MUST** match the key order defined in the corresponding [record type](#record-type).
+
+
+
+Other Modifications
+-------------------
+
+### Object
+
+In addition to strings, an object in ORB may use integer (up to signed 64 bits in size), [UUID](#uuid), and [timestamp](#timestamp) types as keys.
+
+All keys in an object **MUST** be of the same type (all signed integers, all UUIDs, all timestamps, or all strings).
 
 
 
